@@ -1,0 +1,27 @@
+[
+    {
+      "id": "breathing_focus_001",
+      "category": "focus",
+      "title": "Focus Reset",
+      "steps": [
+        "Pause what you are doing for a moment.",
+        "Breathe in gently for 4 seconds.",
+        "Breathe out for 4 seconds.",
+        "Repeat 4 times.",
+        "Choose one small task to begin after you finish."
+      ],
+      "closing": "You do not need to complete everything at once. Start with one step."
+    },
+    {
+      "id": "breathing_focus_002",
+      "category": "focus",
+      "title": "Clear the Noise",
+      "steps": [
+        "Look away from your screen if possible.",
+        "Take one comfortable breath in.",
+        "Let the breath out slowly.",
+        "Repeat 5 times while keeping your shoulders relaxed."
+      ],
+      "closing": "Return to the task that matters most right now."
+    }
+  ]

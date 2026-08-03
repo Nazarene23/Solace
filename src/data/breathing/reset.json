@@ -1,0 +1,26 @@
+[
+    {
+      "id": "breathing_reset_001",
+      "category": "reset",
+      "title": "One-Minute Reset",
+      "steps": [
+        "Unclench your jaw and lower your shoulders.",
+        "Take a comfortable breath in.",
+        "Let it out a little more slowly than you breathed in.",
+        "Repeat this 5 times."
+      ],
+      "closing": "Take a moment before moving on. There is no need to rush."
+    },
+    {
+      "id": "breathing_reset_002",
+      "category": "reset",
+      "title": "Pause and Reset",
+      "steps": [
+        "Notice where your body is touching the chair or floor.",
+        "Breathe in gently through your nose.",
+        "Breathe out slowly through your mouth.",
+        "Repeat 4 times at a comfortable pace."
+      ],
+      "closing": "Bring your attention back to what is around you."
+    }
+  ]

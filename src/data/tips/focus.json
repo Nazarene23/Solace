@@ -1,0 +1,17 @@
+[
+    {
+      "id": "tip_focus_001",
+      "category": "focus",
+      "text": "Choose one manageable task and give it your attention for ten minutes."
+    },
+    {
+      "id": "tip_focus_002",
+      "category": "focus",
+      "text": "Put away one distraction before starting your next task."
+    },
+    {
+      "id": "tip_focus_003",
+      "category": "focus",
+      "text": "Break a large task into the smallest first step you can complete."
+    }
+  ]

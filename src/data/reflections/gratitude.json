@@ -1,0 +1,17 @@
+[
+    {
+      "id": "reflection_gratitude_001",
+      "category": "gratitude",
+      "text": "What is one small thing you appreciated today?"
+    },
+    {
+      "id": "reflection_gratitude_002",
+      "category": "gratitude",
+      "text": "Who made your day a little easier recently?"
+    },
+    {
+      "id": "reflection_gratitude_003",
+      "category": "gratitude",
+      "text": "What ordinary part of your day are you thankful for?"
+    }
+  ]

@@ -1,0 +1,26 @@
+[
+    {
+      "id": "breathing_calm_001",
+      "category": "calm",
+      "title": "Gentle Calm",
+      "steps": [
+        "Sit comfortably and let your shoulders relax.",
+        "Breathe in gently through your nose for 4 seconds.",
+        "Breathe out slowly for 6 seconds.",
+        "Repeat this pattern 4 times."
+      ],
+      "closing": "Let your breathing return to its normal rhythm when you are ready."
+    },
+    {
+      "id": "breathing_calm_002",
+      "category": "calm",
+      "title": "Slow Exhale",
+      "steps": [
+        "Place both feet on the floor if that feels comfortable.",
+        "Breathe in gently for 3 seconds.",
+        "Breathe out slowly for 5 seconds.",
+        "Repeat 5 times without forcing your breath."
+      ],
+      "closing": "Notice whether your shoulders or jaw feel a little less tense."
+    }
+  ]
