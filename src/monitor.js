@@ -1,13 +1,25 @@
 require("dotenv").config();
 
 const os = require("node:os");
-const { execFile } = require("node:child_process");
-const { promisify } = require("node:util");
 
-const execFileAsync = promisify(execFile);
+const {
+  execFile,
+} = require("node:child_process");
+
+const {
+  promisify,
+} = require("node:util");
+
+const execFileAsync =
+  promisify(execFile);
 
 const CHECK_INTERVAL_MS = 30_000;
-const HEARTBEAT_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+const HEARTBEAT_INTERVAL_MS =
+  6 * 60 * 60 * 1000;
+
+const DISCORD_FAILURE_THRESHOLD = 3;
+const DISCORD_SUCCESS_THRESHOLD = 2;
 
 const telegramToken =
   process.env.TELEGRAM_BOT_TOKEN;
@@ -17,14 +29,20 @@ const telegramChatId =
 
 if (!telegramToken || !telegramChatId) {
   console.error(
-    "[MONITOR] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.",
+    "[MONITOR] Telegram configuration is missing.",
   );
 
   process.exit(1);
 }
 
-let previousState = null;
+let confirmedDiscordStatus = null;
+
+let discordFailureCount = 0;
+let discordSuccessCount = 0;
+
+let previousReportedState = null;
 let lastHeartbeatAt = 0;
+
 let pendingMessages = [];
 
 async function sendTelegram(message) {
@@ -32,18 +50,25 @@ async function sendTelegram(message) {
     `https://api.telegram.org/bot${telegramToken}/sendMessage`,
     {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
+
       body: JSON.stringify({
         chat_id: telegramChatId,
         text: message,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
       }),
-      signal: AbortSignal.timeout(15_000),
+
+      signal:
+        AbortSignal.timeout(15_000),
     },
   );
 
-  const result = await response.json();
+  const result =
+    await response.json();
 
   if (!response.ok || !result.ok) {
     throw new Error(
@@ -55,7 +80,9 @@ async function sendTelegram(message) {
 
 async function getSolaceProcessStatus() {
   try {
-    const { stdout } = await execFileAsync(
+    const {
+      stdout,
+    } = await execFileAsync(
       "pm2",
       ["jlist"],
       {
@@ -64,14 +91,20 @@ async function getSolaceProcessStatus() {
       },
     );
 
-    const processes = JSON.parse(stdout);
+    const processes =
+      JSON.parse(stdout);
 
-    const solace = processes.find(
-      (processInfo) =>
-        processInfo.name === "solace",
+    const solace =
+      processes.find(
+        (processInfo) =>
+          processInfo.name ===
+          "solace",
+      );
+
+    return (
+      solace?.pm2_env?.status ??
+      "stopped"
     );
-
-    return solace?.pm2_env?.status ?? "stopped";
   } catch (error) {
     console.error(
       "[MONITOR] Could not read PM2 status:",
@@ -87,7 +120,8 @@ async function canReachDiscord() {
     const response = await fetch(
       "https://discord.com/api/v10/gateway",
       {
-        signal: AbortSignal.timeout(10_000),
+        signal:
+          AbortSignal.timeout(10_000),
       },
     );
 
@@ -97,25 +131,60 @@ async function canReachDiscord() {
   }
 }
 
+function updateDiscordStatus(
+  reachable,
+) {
+  if (reachable) {
+    discordSuccessCount += 1;
+    discordFailureCount = 0;
+
+    if (
+      discordSuccessCount >=
+      DISCORD_SUCCESS_THRESHOLD
+    ) {
+      confirmedDiscordStatus = true;
+    }
+
+    return;
+  }
+
+  discordFailureCount += 1;
+  discordSuccessCount = 0;
+
+  if (
+    discordFailureCount >=
+    DISCORD_FAILURE_THRESHOLD
+  ) {
+    confirmedDiscordStatus = false;
+  }
+}
+
 function formatUptime(seconds) {
-  const totalMinutes = Math.floor(
-    seconds / 60,
-  );
+  const totalMinutes =
+    Math.floor(seconds / 60);
 
-  const days = Math.floor(
-    totalMinutes / 1440,
-  );
+  const days =
+    Math.floor(
+      totalMinutes / 1440,
+    );
 
-  const hours = Math.floor(
-    (totalMinutes % 1440) / 60,
-  );
+  const hours =
+    Math.floor(
+      (totalMinutes % 1440) / 60,
+    );
 
   const minutes =
     totalMinutes % 60;
 
   return [
-    days > 0 ? `${days}d` : null,
-    hours > 0 ? `${hours}h` : null,
+    days > 0
+      ? `${days}d`
+      : null,
+
+    hours > 0
+      ? `${hours}h`
+      : null,
+
     `${minutes}m`,
   ]
     .filter(Boolean)
@@ -123,21 +192,77 @@ function formatUptime(seconds) {
 }
 
 function getTimestamp() {
-  return new Intl.DateTimeFormat(
-    "en-PH",
-    {
-      timeZone: "Asia/Manila",
-      dateStyle: "medium",
-      timeStyle: "medium",
-    },
-  ).format(new Date());
+  const formatted =
+    new Intl.DateTimeFormat(
+      "en-PH",
+      {
+        timeZone: "Asia/Manila",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      },
+    ).format(new Date());
+
+  return `${formatted} PHT`;
 }
 
-function createStatusMessage(state, title) {
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function getMessageHeader(type) {
+  const headers = {
+    startup: [
+      "🌿 <b>Solace Monitor</b>",
+      "<i>Monitoring service initialized</i>",
+    ],
+
+    alert: [
+      "⚠️ <b>Service Alert</b>",
+      "<i>A monitored service changed state</i>",
+    ],
+
+    recovery: [
+      "✅ <b>Systems Recovered</b>",
+      "<i>Services are responding normally</i>",
+    ],
+
+    heartbeat: [
+      "💙 <b>Solace Heartbeat</b>",
+      "<i>Scheduled system health report</i>",
+    ],
+  };
+
+  return (
+    headers[type] ??
+    headers.alert
+  );
+}
+
+function createStatusMessage(
+  state,
+  type,
+) {
+  const [
+    heading,
+    subtitle,
+  ] = getMessageHeader(type);
+
+  const processOnline =
+    state.processStatus === "online";
+
   const processIcon =
-    state.processStatus === "online"
+    processOnline
       ? "🟢"
-      : state.processStatus === "unknown"
+      : state.processStatus ===
+          "unknown"
         ? "🟠"
         : "🔴";
 
@@ -147,60 +272,119 @@ function createStatusMessage(state, title) {
       : "🔴";
 
   const memoryUsed =
-    os.totalmem() - os.freemem();
+    os.totalmem() -
+    os.freemem();
 
-  const memoryPercent = Math.round(
-    (memoryUsed / os.totalmem()) * 100,
-  );
+  const memoryPercent =
+    Math.round(
+      (memoryUsed /
+        os.totalmem()) *
+        100,
+    );
+
+  const processLabel =
+    escapeHtml(
+      state.processStatus.toUpperCase(),
+    );
+
+  const discordLabel =
+    state.discordReachable
+      ? "REACHABLE"
+      : "UNREACHABLE";
 
   return [
-    title,
+    heading,
+    subtitle,
     "",
-    `${processIcon} Solace process: ${state.processStatus}`,
-    `${discordIcon} Discord API: ${
-      state.discordReachable
-        ? "reachable"
-        : "unreachable"
-    }`,
-    `⏱️ Phone uptime: ${formatUptime(os.uptime())}`,
-    `💾 RAM usage: ${memoryPercent}%`,
-    `🕒 ${getTimestamp()}`,
+    "━━━━━━━━━━━━━━━━━━",
+    "",
+    "<b>Service Health</b>",
+    `${processIcon} <b>Solace</b>   <code>${processLabel}</code>`,
+    `${discordIcon} <b>Discord</b>  <code>${discordLabel}</code>`,
+    "",
+    "<b>Host Device</b>",
+    `⏱ Uptime   <code>${escapeHtml(formatUptime(os.uptime()))}</code>`,
+    `💾 Memory   <code>${memoryPercent}% used</code>`,
+    "",
+    "━━━━━━━━━━━━━━━━━━",
+    `<i>${escapeHtml(getTimestamp())}</i>`,
   ].join("\n");
 }
 
+function statesMatch(
+  first,
+  second,
+) {
+  return (
+    first?.processStatus ===
+      second?.processStatus &&
+    first?.discordReachable ===
+      second?.discordReachable
+  );
+}
+
 async function runCheck() {
+  const processStatus =
+    await getSolaceProcessStatus();
+
+  const rawDiscordStatus =
+    await canReachDiscord();
+
+  updateDiscordStatus(
+    rawDiscordStatus,
+  );
+
+  if (
+    confirmedDiscordStatus ===
+    null
+  ) {
+    return;
+  }
+
   const state = {
-    processStatus:
-      await getSolaceProcessStatus(),
+    processStatus,
 
     discordReachable:
-      await canReachDiscord(),
+      confirmedDiscordStatus,
   };
 
   const stateChanged =
-    !previousState ||
-    previousState.processStatus !==
-      state.processStatus ||
-    previousState.discordReachable !==
-      state.discordReachable;
+    !statesMatch(
+      state,
+      previousReportedState,
+    );
 
   if (stateChanged) {
-    const title = !previousState
-      ? "🌱 Solace Monitor started"
-      : "⚠️ Solace status changed";
+    let messageType = "alert";
+
+    if (
+      previousReportedState ===
+      null
+    ) {
+      messageType = "startup";
+    } else if (
+      state.processStatus ===
+        "online" &&
+      state.discordReachable
+    ) {
+      messageType = "recovery";
+    }
 
     pendingMessages.push(
       createStatusMessage(
         state,
-        title,
+        messageType,
       ),
     );
 
-    previousState = state;
+    previousReportedState = {
+      ...state,
+    };
   }
 
   const heartbeatDue =
-    Date.now() - lastHeartbeatAt >=
+    Date.now() -
+      lastHeartbeatAt >=
     HEARTBEAT_INTERVAL_MS;
 
   if (
@@ -210,18 +394,22 @@ async function runCheck() {
     pendingMessages.push(
       createStatusMessage(
         state,
-        "💙 Solace monitoring heartbeat",
+        "heartbeat",
       ),
     );
   }
 
-  if (pendingMessages.length === 0) {
+  if (
+    pendingMessages.length === 0
+  ) {
     return;
   }
 
   try {
     await sendTelegram(
-      pendingMessages.join("\n\n"),
+      pendingMessages
+        .slice(-5)
+        .join("\n\n"),
     );
 
     pendingMessages = [];
