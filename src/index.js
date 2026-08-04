@@ -9,17 +9,29 @@ const {
   GatewayIntentBits,
 } = require('discord.js');
 
-const requiredEnv = ['DISCORD_TOKEN'];
+const runtimeHealthService = require(
+  './services/runtimeHealthService',
+);
+
+const requiredEnv = [
+  'DISCORD_TOKEN',
+];
 
 for (const key of requiredEnv) {
   if (!process.env[key]) {
-    console.error(`Missing required environment variable: ${key}`);
+    console.error(
+      `Missing required environment variable: ${key}`,
+    );
+
     process.exit(1);
   }
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [
+    GatewayIntentBits.Guilds,
+  ],
+
   allowedMentions: {
     parse: [],
   },
@@ -30,50 +42,123 @@ client.commands = new Collection();
 /*
  * Load slash commands
  */
-const commandsPath = path.join(__dirname, 'commands');
+const commandsPath = path.join(
+  __dirname,
+  'commands',
+);
 
 const commandFiles = fs
   .readdirSync(commandsPath)
-  .filter((file) => file.endsWith('.js'));
+  .filter(
+    (file) =>
+      file.endsWith('.js'),
+  );
 
 for (const file of commandFiles) {
-  const filePath = path.join(commandsPath, file);
-  const command = require(filePath);
+  const filePath = path.join(
+    commandsPath,
+    file,
+  );
 
-  if (!command.data || !command.execute) {
-    console.warn(`Skipping invalid command file: ${file}`);
+  const command =
+    require(filePath);
+
+  if (
+    !command.data ||
+    !command.execute
+  ) {
+    console.warn(
+      `Skipping invalid command file: ${file}`,
+    );
+
     continue;
   }
 
-  client.commands.set(command.data.name, command);
-  console.log(`Loaded command: ${command.data.name}`);
+  client.commands.set(
+    command.data.name,
+    command,
+  );
+
+  console.log(
+    `Loaded command: ${command.data.name}`,
+  );
 }
 
 /*
  * Load events
  */
-const eventsPath = path.join(__dirname, 'events');
+const eventsPath = path.join(
+  __dirname,
+  'events',
+);
 
 const eventFiles = fs
   .readdirSync(eventsPath)
-  .filter((file) => file.endsWith('.js'));
+  .filter(
+    (file) =>
+      file.endsWith('.js'),
+  );
 
 for (const file of eventFiles) {
-  const filePath = path.join(eventsPath, file);
-  const event = require(filePath);
+  const filePath = path.join(
+    eventsPath,
+    file,
+  );
 
-  if (!event.name || !event.execute) {
-    console.warn(`Skipping invalid event file: ${file}`);
+  const event =
+    require(filePath);
+
+  if (
+    !event.name ||
+    !event.execute
+  ) {
+    console.warn(
+      `Skipping invalid event file: ${file}`,
+    );
+
     continue;
   }
 
   if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args));
+    client.once(
+      event.name,
+      (...args) =>
+        event.execute(...args),
+    );
   } else {
-    client.on(event.name, (...args) => event.execute(...args));
+    client.on(
+      event.name,
+      (...args) =>
+        event.execute(...args),
+    );
   }
 
-  console.log(`Loaded event: ${event.name}`);
+  console.log(
+    `Loaded event: ${event.name}`,
+  );
 }
 
-client.login(process.env.DISCORD_TOKEN);
+/*
+ * Start private runtime health reporting
+ * before connecting to Discord.
+ */
+runtimeHealthService.start(
+  client,
+);
+
+client
+  .login(
+    process.env.DISCORD_TOKEN,
+  )
+  .catch((error) => {
+    console.error(
+      '[LOGIN] Solace could not connect to Discord:',
+      error,
+    );
+
+    /*
+     * PM2 will restart Solace after
+     * a failed initial connection.
+     */
+    process.exit(1);
+  });

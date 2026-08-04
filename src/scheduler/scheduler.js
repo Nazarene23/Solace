@@ -10,6 +10,10 @@ const dailyPostService = require(
   "../services/dailyPostService",
 );
 
+const runtimeHealthService = require(
+  "../services/runtimeHealthService",
+);
+
 const CHECK_INTERVAL_MS = 30_000;
 
 let schedulerStarted = false;
@@ -48,12 +52,17 @@ async function runSchedulerLoop(client) {
 }
 
 async function checkScheduledPosts(client) {
+  runtimeHealthService
+    .recordSchedulerCheck();
+
   const allSettings =
     settingsService.getAllGuildSettings();
 
   for (
-    const [guildId, storedSettings]
-    of Object.entries(allSettings)
+    const [
+      guildId,
+      storedSettings,
+    ] of Object.entries(allSettings)
   ) {
     try {
       const settings = {
@@ -77,9 +86,10 @@ async function checkScheduledPosts(client) {
         continue;
       }
 
-      const localTime = getLocalTime(
-        settings.timezone,
-      );
+      const localTime =
+        getLocalTime(
+          settings.timezone,
+        );
 
       if (!localTime) {
         console.warn(
@@ -112,17 +122,27 @@ async function checkScheduledPosts(client) {
         settings,
       );
 
-      settingsService.updateGuildSettings(
-        guildId,
-        {
-          lastPostedDate:
-            localTime.date,
+      settingsService
+        .updateGuildSettings(
+          guildId,
+          {
+            lastPostedDate:
+              localTime.date,
 
-          lastPostedAt:
-            new Date().toISOString(),
-        },
-      );
+            lastPostedAt:
+              new Date()
+                .toISOString(),
+          },
+        );
+
+      runtimeHealthService
+        .recordDailyPostSuccess();
     } catch (error) {
+      runtimeHealthService
+        .recordDailyPostFailure(
+          error,
+        );
+
       console.error(
         `[SCHEDULER] Failed for guild ${guildId}:`,
         error,
@@ -155,7 +175,9 @@ function getLocalTime(timezone) {
     const values = {};
 
     for (const part of parts) {
-      if (part.type !== "literal") {
+      if (
+        part.type !== "literal"
+      ) {
         values[part.type] =
           part.value;
       }
@@ -165,8 +187,11 @@ function getLocalTime(timezone) {
       date:
         `${values.year}-${values.month}-${values.day}`,
 
-      hour: values.hour,
-      minute: values.minute,
+      hour:
+        values.hour,
+
+      minute:
+        values.minute,
     };
   } catch (error) {
     console.error(
@@ -196,7 +221,8 @@ async function sendDailyPost(
   if (
     !channel ||
     !channel.isTextBased() ||
-    typeof channel.send !== "function"
+    typeof channel.send !==
+      "function"
   ) {
     throw new Error(
       "Configured channel is unavailable or unsupported.",
@@ -251,24 +277,33 @@ async function sendDailyPost(
 
       allowedMentions = {
         parse: [],
+
         roles: [
           mentionRole.id,
         ],
+
         users: [],
+
         repliedUser: false,
       };
     }
   }
 
   const embed =
-    dailyPostService.createDailyPost(
-      settings,
-      client.user,
-    );
+    dailyPostService
+      .createDailyPost(
+        settings,
+        client.user,
+      );
 
   await channel.send({
-    content: messageContent,
-    embeds: [embed],
+    content:
+      messageContent,
+
+    embeds: [
+      embed,
+    ],
+
     allowedMentions,
   });
 

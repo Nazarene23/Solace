@@ -18,6 +18,11 @@ src/data/guildSettings.backup.json
 src/data/guildSettings.manual-backup.json
 src/data/guildSettings.tmp.json
 
+# Private runtime monitoring data
+src/data/runtimeHealth.json
+src/data/monitorState.json
+src/data/monitorHistory.json
+
 # Operating system and editor files
 .DS_Store
 Thumbs.db
