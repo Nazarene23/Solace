@@ -445,10 +445,20 @@ function escapeHtml(value) {
   }
   
   function createDailySummary(snapshot, stats) {
-    const availability = stats.checks > 0
-      ? ((stats.healthyChecks / stats.checks) * 100).toFixed(2)
-      : "0.00";
-  
+    const checks = stats.checks ?? 0;
+    const healthyChecks = stats.healthyChecks ?? 0;
+    const solaceOnlineChecks = stats.solaceOnlineChecks ?? 0;
+    const discordConnectedChecks = stats.discordConnectedChecks ?? 0;
+    const schedulerHealthyChecks = stats.schedulerHealthyChecks ?? 0;
+
+    function formatAvailability(successfulChecks) {
+      if (checks <= 0) {
+        return "0.00%";
+      }
+
+      return `${((successfulChecks / checks) * 100).toFixed(2)}%`;
+    }
+
     return [
       "🌅 <b>Solace Daily Report</b>",
       "<i>Monitoring summary for the current reporting period</i>",
@@ -456,8 +466,11 @@ function escapeHtml(value) {
       "━━━━━━━━━━━━━━━━━━",
       "",
       "<b>Availability</b>",
-      metricLine("🟢", "Healthy checks", `${stats.healthyChecks}/${stats.checks}`),
-      metricLine("📈", "Observed availability", `${availability}%`),
+      metricLine("🌿", "Solace process", formatAvailability(solaceOnlineChecks)),
+      metricLine("🌐", "Discord connectivity", formatAvailability(discordConnectedChecks)),
+      metricLine("🕕", "Scheduler health", formatAvailability(schedulerHealthyChecks)),
+      metricLine("📊", "Overall system health", formatAvailability(healthyChecks)),
+      metricLine("🔎", "Checks observed", String(checks)),
       metricLine("🔄", "Solace restarts", String(stats.solaceRestarts ?? 0)),
       metricLine("🌐", "Discord outages", String(stats.discordOutages ?? 0)),
       "",
@@ -473,7 +486,7 @@ function escapeHtml(value) {
       `<i>${escapeHtml(formatTimestamp(snapshot.collectedAt))}</i>`,
     ].join("\n");
   }
-  
+
   function createAlert({
     level = "warning",
     title,

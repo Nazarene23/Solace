@@ -42,6 +42,9 @@ function createDefaultStats() {
     periodStartedAt: new Date().toISOString(),
     checks: 0,
     healthyChecks: 0,
+    solaceOnlineChecks: 0,
+    discordConnectedChecks: 0,
+    schedulerHealthyChecks: 0,
     solaceRestarts: 0,
     discordOutages: 0,
     lowestBattery: null,
@@ -380,12 +383,37 @@ function getManilaClock() {
 }
 
 function updateStatistics(snapshot, health) {
+  /*
+   * Older saved monitor states do not contain the separated
+   * availability counters. Start a fresh reporting period when
+   * upgrading so the first new report does not show false zeros.
+   */
+  if (
+    !Number.isFinite(state.stats?.solaceOnlineChecks) ||
+    !Number.isFinite(state.stats?.discordConnectedChecks) ||
+    !Number.isFinite(state.stats?.schedulerHealthyChecks)
+  ) {
+    state.stats = createDefaultStats();
+  }
+
   const stats = state.stats;
 
   stats.checks += 1;
 
   if (health.healthy) {
     stats.healthyChecks += 1;
+  }
+
+  if (snapshot.pm2?.solace?.status === "online") {
+    stats.solaceOnlineChecks += 1;
+  }
+
+  if (health.discordRest === true && health.gateway === true) {
+    stats.discordConnectedChecks += 1;
+  }
+
+  if (health.scheduler === true) {
+    stats.schedulerHealthyChecks += 1;
   }
 
   const battery = snapshot.battery?.percentage;
