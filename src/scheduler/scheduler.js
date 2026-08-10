@@ -15,6 +15,10 @@ const runtimeHealthService = require(
 );
 
 const CHECK_INTERVAL_MS = 30_000;
+const RETRY_DELAY_MS = 5 * 60_000;
+
+const guildsInProgress = new Set();
+const retryAfterByGuild = new Map();
 
 let schedulerStarted = false;
 
@@ -52,68 +56,122 @@ async function runSchedulerLoop(client) {
 }
 
 async function checkScheduledPosts(client) {
-  runtimeHealthService
-    .recordSchedulerCheck();
+  runtimeHealthService.recordSchedulerCheck();
 
   const allSettings =
     settingsService.getAllGuildSettings();
 
   for (
-    const [
-      guildId,
-      storedSettings,
-    ] of Object.entries(allSettings)
+    const [guildId, storedSettings]
+    of Object.entries(allSettings)
   ) {
+    const settings = {
+      ...storedSettings,
+      guildId,
+    };
+
+    if (!settings.enabled) {
+      continue;
+    }
+
+    if (
+      !settings.channelId ||
+      !settings.timezone ||
+      !settings.postingTime
+    ) {
+      console.warn(
+        `[SCHEDULER] Incomplete settings for guild ${guildId}.`,
+      );
+
+      continue;
+    }
+
+    const localTime = getLocalTime(
+      settings.timezone,
+    );
+
+    if (!localTime) {
+      console.warn(
+        `[SCHEDULER] Invalid timezone for guild ${guildId}: ${settings.timezone}`,
+      );
+
+      continue;
+    }
+
+    const scheduledMinutes =
+      parseTimeToMinutes(
+        settings.postingTime,
+      );
+
+    if (scheduledMinutes === null) {
+      console.warn(
+        `[SCHEDULER] Invalid posting time for guild ${guildId}: ${settings.postingTime}`,
+      );
+
+      continue;
+    }
+
+    const currentMinutes =
+      Number(localTime.hour) * 60 +
+      Number(localTime.minute);
+
+    /*
+     * Wait until today's configured posting time.
+     *
+     * If Solace was offline or had no internet at that
+     * exact time, this condition remains true later in
+     * the same day so the post can be delivered once
+     * connectivity returns.
+     */
+    if (currentMinutes < scheduledMinutes) {
+      continue;
+    }
+
+    /*
+     * Never post more than once for the same local date.
+     */
+    if (
+      settings.lastPostedDate ===
+      localTime.date
+    ) {
+      continue;
+    }
+
+    /*
+     * Prevent two scheduler checks from posting for the
+     * same guild simultaneously.
+     */
+    if (guildsInProgress.has(guildId)) {
+      continue;
+    }
+
+    /*
+     * After a failed delivery, wait before trying again
+     * instead of sending a request every 30 seconds.
+     */
+    const retryAfter =
+      retryAfterByGuild.get(guildId);
+
+    if (
+      retryAfter &&
+      Date.now() < retryAfter
+    ) {
+      continue;
+    }
+
+    const currentTime =
+      `${localTime.hour}:${localTime.minute}`;
+
+    const isCatchUp =
+      currentMinutes > scheduledMinutes;
+
+    guildsInProgress.add(guildId);
+
     try {
-      const settings = {
-        ...storedSettings,
-        guildId,
-      };
-
-      if (!settings.enabled) {
-        continue;
-      }
-
-      if (
-        !settings.channelId ||
-        !settings.timezone ||
-        !settings.postingTime
-      ) {
-        console.warn(
-          `[SCHEDULER] Incomplete settings for guild ${guildId}.`,
+      if (isCatchUp) {
+        console.log(
+          `[SCHEDULER] Attempting catch-up post for guild ${guildId}. Scheduled for ${settings.postingTime}; current local time is ${currentTime}.`,
         );
-
-        continue;
-      }
-
-      const localTime =
-        getLocalTime(
-          settings.timezone,
-        );
-
-      if (!localTime) {
-        console.warn(
-          `[SCHEDULER] Invalid timezone for guild ${guildId}: ${settings.timezone}`,
-        );
-
-        continue;
-      }
-
-      const currentTime =
-        `${localTime.hour}:${localTime.minute}`;
-
-      if (
-        currentTime !==
-        settings.postingTime
-      ) {
-        continue;
-      }
-
-      if (
-        settings.lastPostedDate ===
-        localTime.date
-      ) {
-        continue;
       }
 
       await sendDailyPost(
@@ -122,33 +180,68 @@ async function checkScheduledPosts(client) {
         settings,
       );
 
-      settingsService
-        .updateGuildSettings(
-          guildId,
-          {
-            lastPostedDate:
-              localTime.date,
+      settingsService.updateGuildSettings(
+        guildId,
+        {
+          lastPostedDate:
+            localTime.date,
 
-            lastPostedAt:
-              new Date()
-                .toISOString(),
-          },
-        );
+          lastPostedAt:
+            new Date().toISOString(),
+        },
+      );
+
+      retryAfterByGuild.delete(guildId);
 
       runtimeHealthService
         .recordDailyPostSuccess();
     } catch (error) {
+      retryAfterByGuild.set(
+        guildId,
+        Date.now() + RETRY_DELAY_MS,
+      );
+
       runtimeHealthService
         .recordDailyPostFailure(
           error,
         );
 
       console.error(
-        `[SCHEDULER] Failed for guild ${guildId}:`,
+        `[SCHEDULER] Failed for guild ${guildId}. Retrying in ${RETRY_DELAY_MS / 60_000} minutes:`,
         error,
       );
+    } finally {
+      guildsInProgress.delete(guildId);
     }
   }
+}
+
+function parseTimeToMinutes(time) {
+  if (
+    typeof time !== "string" ||
+    !/^\d{2}:\d{2}$/.test(time)
+  ) {
+    return null;
+  }
+
+  const [hourText, minuteText] =
+    time.split(":");
+
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return null;
+  }
+
+  return hour * 60 + minute;
 }
 
 function getLocalTime(timezone) {
@@ -175,9 +268,7 @@ function getLocalTime(timezone) {
     const values = {};
 
     for (const part of parts) {
-      if (
-        part.type !== "literal"
-      ) {
+      if (part.type !== "literal") {
         values[part.type] =
           part.value;
       }
@@ -187,11 +278,8 @@ function getLocalTime(timezone) {
       date:
         `${values.year}-${values.month}-${values.day}`,
 
-      hour:
-        values.hour,
-
-      minute:
-        values.minute,
+      hour: values.hour,
+      minute: values.minute,
     };
   } catch (error) {
     console.error(
@@ -221,8 +309,7 @@ async function sendDailyPost(
   if (
     !channel ||
     !channel.isTextBased() ||
-    typeof channel.send !==
-      "function"
+    typeof channel.send !== "function"
   ) {
     throw new Error(
       "Configured channel is unavailable or unsupported.",
@@ -277,33 +364,26 @@ async function sendDailyPost(
 
       allowedMentions = {
         parse: [],
-
         roles: [
           mentionRole.id,
         ],
-
         users: [],
-
         repliedUser: false,
       };
     }
   }
 
   const embed =
-    dailyPostService
-      .createDailyPost(
-        settings,
-        client.user,
-      );
+    dailyPostService.createDailyPost(
+      settings,
+      client.user,
+    );
 
   await channel.send({
-    content:
-      messageContent,
-
+    content: messageContent,
     embeds: [
       embed,
     ],
-
     allowedMentions,
   });
 
