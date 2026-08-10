@@ -8,6 +8,12 @@ function normalizeText(text) {
     .toLowerCase();
 }
 
+function cleanText(text) {
+  return text
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 function loadContentPacks(folderPath) {
   if (!fs.existsSync(folderPath)) {
     throw new Error(
@@ -30,7 +36,7 @@ function loadContentPacks(folderPath) {
 
   const allItems = [];
   const usedIds = new Map();
-  const usedTexts = new Map();
+  const usedContent = new Map();
 
   for (const file of files) {
     const filePath = path.join(
@@ -96,25 +102,9 @@ function loadContentPacks(folderPath) {
         );
       }
 
-      if (
-        typeof item.text !== "string" ||
-        !item.text.trim()
-      ) {
-        throw new Error(
-          `Missing or invalid text in ${location}.`,
-        );
-      }
-
       const id = item.id.trim();
       const category =
         item.category.trim();
-
-      const text = item.text
-        .trim()
-        .replace(/\s+/g, " ");
-
-      const normalizedText =
-        normalizeText(text);
 
       if (usedIds.has(id)) {
         throw new Error(
@@ -123,12 +113,99 @@ function loadContentPacks(folderPath) {
         );
       }
 
+      let cleanedItem;
+      let contentKey;
+
       if (
-        usedTexts.has(normalizedText)
+        Object.prototype.hasOwnProperty.call(
+          item,
+          "text",
+        )
       ) {
+        if (
+          typeof item.text !== "string" ||
+          !item.text.trim()
+        ) {
+          throw new Error(
+            `Missing or invalid text in ${location}.`,
+          );
+        }
+
+        const text = cleanText(
+          item.text,
+        );
+
+        contentKey =
+          `text:${normalizeText(text)}`;
+
+        cleanedItem = {
+          ...item,
+          id,
+          category,
+          text,
+        };
+      } else {
+        if (
+          typeof item.title !== "string" ||
+          !item.title.trim()
+        ) {
+          throw new Error(
+            `Missing or invalid title in ${location}.`,
+          );
+        }
+
+        if (
+          !Array.isArray(item.steps) ||
+          item.steps.length === 0 ||
+          item.steps.some(
+            (step) =>
+              typeof step !== "string" ||
+              !step.trim(),
+          )
+        ) {
+          throw new Error(
+            `Missing or invalid breathing steps in ${location}.`,
+          );
+        }
+
+        if (
+          typeof item.closing !== "string" ||
+          !item.closing.trim()
+        ) {
+          throw new Error(
+            `Missing or invalid closing text in ${location}.`,
+          );
+        }
+
+        const title = cleanText(
+          item.title,
+        );
+
+        const steps = item.steps.map(
+          (step) => cleanText(step),
+        );
+
+        const closing = cleanText(
+          item.closing,
+        );
+
+        contentKey =
+          `breathing:${normalizeText(title)}`;
+
+        cleanedItem = {
+          ...item,
+          id,
+          category,
+          title,
+          steps,
+          closing,
+        };
+      }
+
+      if (usedContent.has(contentKey)) {
         throw new Error(
-          `Duplicate content text in ${location}. ` +
-          `It was first used in ${usedTexts.get(normalizedText)}.`,
+          `Duplicate content in ${location}. ` +
+          `It was first used in ${usedContent.get(contentKey)}.`,
         );
       }
 
@@ -137,16 +214,13 @@ function loadContentPacks(folderPath) {
         location,
       );
 
-      usedTexts.set(
-        normalizedText,
+      usedContent.set(
+        contentKey,
         location,
       );
 
       allItems.push({
-        ...item,
-        id,
-        category,
-        text,
+        ...cleanedItem,
         sourcePack:
           path.basename(
             file,

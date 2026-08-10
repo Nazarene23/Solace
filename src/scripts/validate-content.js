@@ -22,6 +22,11 @@ const libraries = [
     folder: "reflections",
     target: 365,
   },
+  {
+    name: "Guided Breathing",
+    folder: "breathing",
+    target: null,
+  },
 ];
 
 let totalItems = 0;
@@ -59,8 +64,15 @@ try {
 
     totalItems += items.length;
 
+    const countLabel =
+      Number.isFinite(
+        library.target,
+      )
+        ? `${items.length}/${library.target}`
+        : String(items.length);
+
     console.log(
-      `${library.name}: ${items.length}/${library.target}`,
+      `${library.name}: ${countLabel}`,
     );
 
     for (
@@ -80,7 +92,7 @@ try {
   );
 
   console.log(
-    "No duplicate IDs, duplicate text, or invalid entries found.",
+    "No duplicate IDs, duplicate content, or invalid entries found.",
   );
 } catch (error) {
   console.error(
