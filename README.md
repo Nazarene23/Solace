@@ -8,6 +8,8 @@ It provides gentle tools for everyday reflection, calm, and wellbeing while givi
 
 > Solace is currently under active development and is not yet publicly released.
 
+Current release stage: private release candidate.
+
 ## Features
 
 ### Member tools
@@ -108,6 +110,14 @@ npm start
 
 ```
 
+## Deployment targets
+
+- `npm run deploy:guild` updates commands in the configured development server immediately.
+- `npm run deploy:global` publishes guild-only commands for every server that installs Solace.
+- `npm run validate:release` checks command definitions and required release files before deployment.
+
+Do not run the global deployment command until the release candidate has passed testing in trusted servers.
+
 ## Data safety
 
 Guild settings are written atomically and protected by an automatic backup. Runtime configuration files and backups inside `src/data` are excluded from Git.
@@ -115,6 +125,8 @@ Guild settings are written atomically and protected by an automatic backup. Runt
 ## Important notice
 
 Solace provides general wellbeing tools and information. It is not a therapist, medical provider, or emergency service.
+
+Read the [Privacy Policy](PRIVACY.md), [Terms of Service](TERMS.md), and [release checklist](RELEASE_CHECKLIST.md).
 
 ## Development status
 

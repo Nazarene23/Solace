@@ -223,9 +223,23 @@ function updateGuildSettings(
   return settings[guildId];
 }
 
+function deleteGuildSettings(guildId) {
+  const settings = readSettings();
+
+  if (!settings[guildId]) {
+    return false;
+  }
+
+  delete settings[guildId];
+  writeSettings(settings);
+
+  return true;
+}
+
 module.exports = {
   getGuildSettings,
   getAllGuildSettings,
   saveGuildSettings,
   updateGuildSettings,
+  deleteGuildSettings,
 };

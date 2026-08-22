@@ -4,15 +4,31 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
+  ApplicationIntegrationType,
+  InteractionContextType,
   REST,
   Routes,
 } = require('discord.js');
 
+const deploymentTarget =
+  process.argv[2] ?? 'guild';
+
+if (!['guild', 'global'].includes(deploymentTarget)) {
+  console.error(
+    'Choose a deployment target: guild or global.',
+  );
+
+  process.exit(1);
+}
+
 const requiredEnv = [
   'DISCORD_TOKEN',
   'CLIENT_ID',
-  'GUILD_ID',
 ];
+
+if (deploymentTarget === 'guild') {
+  requiredEnv.push('GUILD_ID');
+}
 
 for (const key of requiredEnv) {
   if (!process.env[key]) {
@@ -38,7 +54,20 @@ for (const file of commandFiles) {
     continue;
   }
 
-  commands.push(command.data.toJSON());
+  const commandData =
+    command.data.toJSON();
+
+  if (deploymentTarget === 'global') {
+    commandData.integration_types = [
+      ApplicationIntegrationType.GuildInstall,
+    ];
+
+    commandData.contexts = [
+      InteractionContextType.Guild,
+    ];
+  }
+
+  commands.push(commandData);
 
   console.log(`Loaded command for deployment: ${command.data.name}`);
 }
@@ -50,20 +79,29 @@ const rest = new REST({
 async function deployCommands() {
   try {
     console.log(
-      `Registering ${commands.length} guild command(s)...`,
+      `Registering ${commands.length} ${deploymentTarget} command(s)...`,
     );
 
+    const route =
+      deploymentTarget === 'global'
+        ? Routes.applicationCommands(
+            process.env.CLIENT_ID,
+          )
+        : Routes.applicationGuildCommands(
+            process.env.CLIENT_ID,
+            process.env.GUILD_ID,
+          );
+
     await rest.put(
-      Routes.applicationGuildCommands(
-        process.env.CLIENT_ID,
-        process.env.GUILD_ID,
-      ),
+      route,
       {
         body: commands,
       },
     );
 
-    console.log('Guild commands registered successfully.');
+    console.log(
+      `${deploymentTarget === 'global' ? 'Global' : 'Guild'} commands registered successfully.`,
+    );
   } catch (error) {
     console.error('Failed to register commands:', error);
     process.exit(1);
