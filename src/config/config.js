@@ -13,6 +13,12 @@ module.exports = {
 
   support: {
     website: null,
-    discord: null,
+    discord: "https://discord.gg/Y5tM2vHdzw",
+    privacy:
+      "https://github.com/Nazarene23/Solace/blob/main/PRIVACY.md",
+    terms:
+      "https://github.com/Nazarene23/Solace/blob/main/TERMS.md",
+    source:
+      "https://github.com/Nazarene23/Solace",
   },
 };

@@ -128,6 +128,12 @@ Solace provides general wellbeing tools and information. It is not a therapist, 
 
 Read the [Privacy Policy](PRIVACY.md), [Terms of Service](TERMS.md), and [release checklist](RELEASE_CHECKLIST.md).
 
+## Support
+
+For setup help, bug reports, and service updates, join the [SomeoneListens support server](https://discord.gg/Y5tM2vHdzw).
+
+Please do not share Discord tokens, passwords, personal records, or private wellbeing information in support requests.
+
 ## Development status
 
 Solace v1 is currently in testing and stabilization. Permanent 24/7 hosting will begin only after the stability and release-readiness checks are complete.

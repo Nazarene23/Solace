@@ -36,4 +36,4 @@ These terms may be updated as Solace changes. Continued use after an update mean
 
 ## Contact
 
-Questions can be submitted through the official SomeoneListens website or support server once those links are published in Solace's application profile.
+Questions can be submitted through the [SomeoneListens support server](https://discord.gg/Y5tM2vHdzw).

@@ -40,4 +40,4 @@ This policy may be updated as Solace changes. The date at the top will identify 
 
 ## Contact
 
-Questions and deletion requests can be submitted through the official SomeoneListens website or support server once those links are published in Solace's application profile.
+Questions and deletion requests can be submitted through the [SomeoneListens support server](https://discord.gg/Y5tM2vHdzw). Do not include passwords, bot tokens, personal records, or private wellbeing information in a support request.
