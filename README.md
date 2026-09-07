@@ -130,13 +130,13 @@ Read the [Privacy Policy](PRIVACY.md), [Terms of Service](TERMS.md), and [releas
 
 ## Support
 
-For setup help, bug reports, and service updates, join the [SomeoneListens support server](https://discord.gg/Y5tM2vHdzw).
+For setup help, bug reports, and service updates, join the [Solace Official Server](https://discord.gg/TZPwMCRmE).
 
 Please do not share Discord tokens, passwords, personal records, or private wellbeing information in support requests.
 
 ## Development status
 
-Solace v1 is currently in testing and stabilization. Permanent 24/7 hosting will begin only after the stability and release-readiness checks are complete.
+Solace v1 is publicly available, hosted continuously, and officially listed on Top.gg. Ongoing development focuses on stability, useful improvements, and community feedback.
 
 ## License
 

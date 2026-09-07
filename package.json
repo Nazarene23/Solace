@@ -1,6 +1,6 @@
 {
   "name": "solace",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A public Discord wellness companion by SomeoneListens.",
   "main": "src/index.js",
   "scripts": {
